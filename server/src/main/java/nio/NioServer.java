@@ -9,8 +9,11 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -18,6 +21,7 @@ public class NioServer {
 
     private final ByteBuffer buffer = ByteBuffer.allocate(256);
     private String path = "server/serverFiles";
+    private String varPath = path;
     private ServerSocketChannel serverChannel;
     private Selector selector;
 
@@ -67,21 +71,51 @@ public class NioServer {
             String message = msg.toString().trim();
 
             if (message.equals("--list")) {
-                channel.write(ByteBuffer.wrap("cd\r\nmkdir\r\ntouch\r\nls\r\nwrite\r\n".getBytes(StandardCharsets.UTF_8)));
-            } else if (message.equals("cat")) {
-                // TODO: 11.12.2020  вывести содержимое файла
+                channel.write(ByteBuffer.wrap("echo\r\ncat\r\ncd\r\ntouch\r\nls\r\nmkdir\r\nwrite\r\n".getBytes(StandardCharsets.UTF_8)));
+            } else if (message.startsWith("echo")) {
+                String echo = message.replace("echo ", "") + "\r\n";
+                channel.write(ByteBuffer.wrap(echo.getBytes(StandardCharsets.UTF_8)));
+            } else if (message.startsWith("cat")) {
+                String fileName = message.replace("cat ", "");
+                String catPath = varPath + "\\" + fileName;
+                List<String> info = Files.readAllLines(Path.of(catPath));
+                for (int i = 0; i < info.size(); i++) {
+                    info.set(i, info.get(i) + "\r\n");
+                    channel.write(ByteBuffer.wrap(info.get(i).getBytes(StandardCharsets.UTF_8)));
+                }
+            } else if (message.startsWith("cd")) {
+                String newPath = message.replace("cd ", "");
+                if (newPath.equals("")) {
+                    newPath = getVarPath() + "\r\n";
+                    channel.write(ByteBuffer.wrap(newPath.getBytes(StandardCharsets.UTF_8)));
+                } else {
+                    if (Files.isDirectory(Path.of(newPath(newPath).toString()), LinkOption.NOFOLLOW_LINKS)) {
+                        Path directory = Paths.get(newPath(newPath).toString());
+                        setVarPath(directory.toString());
+                        String crPath = getVarPath() + "\r\n";
+                        channel.write(ByteBuffer.wrap(crPath.getBytes(StandardCharsets.UTF_8)));
+                    } else if (newPath.equals("/")){
+                        setVarPath(path);
+                        String crPath = path + "\r\n";
+                        channel.write(ByteBuffer.wrap(crPath.getBytes(StandardCharsets.UTF_8)));
+                    } else {
+                        String errorDirectory = newPath + " is not directory" + "\r\n";
+                        channel.write(ByteBuffer.wrap(errorDirectory.getBytes(StandardCharsets.UTF_8)));
+                    }
+                }
             } else if (message.startsWith("touch ")) {
-                // TODO: 11.12.2020 создать файл
+                String fileName = message.replace("touch ", "");
+                Files.createFile(Path.of(varPath + "\\" + fileName));
             } else if (message.equals("ls")) {
-                String info = Files.list(Path.of(path))
+                String info = Files.list(Path.of(varPath))
                         .map(p -> p.getFileName().toString())
                         .collect(Collectors.joining(", "));
                 info += "\r\n";
                 channel.write(ByteBuffer.wrap(info.getBytes(StandardCharsets.UTF_8)));
             } else if (message.startsWith("mkdir ")) {
                 String dirName = message.split(" +")[1];
-                if (Files.notExists(Path.of(path, dirName))) {
-                    Files.createDirectory(Path.of(path, dirName));
+                if (Files.notExists(Path.of(varPath, dirName))) {
+                    Files.createDirectory(Path.of(varPath, dirName));
                 }
             } else {
                 channel.write(ByteBuffer.wrap("Unknown command!\r\n".getBytes(StandardCharsets.UTF_8)));
@@ -98,4 +132,22 @@ public class NioServer {
         channel.write(buffer);
         buffer.clear();
     }
+
+    public String getPath() {
+        return path;
+    }
+
+    public String getVarPath() {
+        return varPath;
+    }
+
+    public void setVarPath(String varPath) {
+        this.varPath = varPath;
+    }
+
+    private Path newPath(String path){
+        Path newPath = Path.of(getPath() + "\\" + path);
+        return newPath;
+    }
 }
+
