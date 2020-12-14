@@ -67,7 +67,7 @@ public class NioServer {
             String message = msg.toString().trim();
 
             if (message.equals("--list")) {
-                channel.write(ByteBuffer.wrap("cd\nmkdir\ntouch\nls\nwrite\n".getBytes(StandardCharsets.UTF_8)));
+                channel.write(ByteBuffer.wrap("cd\r\nmkdir\r\ntouch\r\nls\r\nwrite\r\n".getBytes(StandardCharsets.UTF_8)));
             } else if (message.equals("cat")) {
                 // TODO: 11.12.2020  вывести содержимое файла
             } else if (message.startsWith("touch ")) {
@@ -76,7 +76,7 @@ public class NioServer {
                 String info = Files.list(Path.of(path))
                         .map(p -> p.getFileName().toString())
                         .collect(Collectors.joining(", "));
-                info += "\n";
+                info += "\r\n";
                 channel.write(ByteBuffer.wrap(info.getBytes(StandardCharsets.UTF_8)));
             } else if (message.startsWith("mkdir ")) {
                 String dirName = message.split(" +")[1];
@@ -84,7 +84,7 @@ public class NioServer {
                     Files.createDirectory(Path.of(path, dirName));
                 }
             } else {
-                channel.write(ByteBuffer.wrap("Unknown command!\n".getBytes(StandardCharsets.UTF_8)));
+                channel.write(ByteBuffer.wrap("Unknown command!\r\n".getBytes(StandardCharsets.UTF_8)));
             }
         }
     }
@@ -93,7 +93,7 @@ public class NioServer {
         SocketChannel channel = serverChannel.accept();
         channel.configureBlocking(false);
         channel.register(selector, SelectionKey.OP_READ);
-        buffer.put("Welcome to MikeOS. Show commands with --list\n".getBytes(StandardCharsets.UTF_8));
+        buffer.put("Welcome to MikeOS. Show commands with --list\r\n".getBytes(StandardCharsets.UTF_8));
         buffer.rewind();
         channel.write(buffer);
         buffer.clear();
